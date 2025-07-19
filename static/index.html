@@ -2,23 +2,101 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Image Prediction UI</title>
     <style>
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f7f9fc;
+            color: #222;
             text-align: center;
-            margin-top: 20px;
+            margin: 20px;
+            padding: 0;
+        }
+
+        h1 {
+            color: #004080;
+            margin-bottom: 10px;
         }
 
         canvas {
-            border: 1px solid #000;
+            border: 2px solid #004080;
             cursor: crosshair;
+            border-radius: 6px;
+            background: white;
+            margin-top: 10px;
+        }
+
+        button {
+            background-color: #004080;
+            border: none;
+            color: white;
+            padding: 10px 18px;
+            margin: 8px 5px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #003060;
         }
 
         #result {
             margin-top: 20px;
-            font-size: 20px;
+            font-size: 22px;
+            font-weight: 600;
+            color: #004080;
+            min-height: 30px;
+        }
+
+        input[type="file"] {
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        #prediction-history {
+            margin-top: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+        }
+
+        #prediction-history h3 {
+            color: #004080;
+            margin-bottom: 15px;
+        }
+
+        #prediction-history ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #prediction-history li {
+            background: white;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 6px rgb(0 64 128 / 0.15);
+            font-size: 16px;
+        }
+
+        #prediction-history li a {
+            color: #0066cc;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        #prediction-history li a:hover {
+            text-decoration: underline;
+        }
+
+        .timestamp {
+            color: #555;
+            font-size: 14px;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -27,15 +105,20 @@
     <h1>Image Upload & Drawing for Prediction</h1>
 
     <h3>Upload Image</h3>
-    <input type="file" accept="image/*" onchange="handleFileUpload(event)">
-    <br><br>
+    <input type="file" accept="image/*" onchange="handleFileUpload(event)" />
+    <br />
 
     <h3>Or Draw Below</h3>
-    <canvas id="canvas" width="280" height="280"></canvas><br>
+    <canvas id="canvas" width="280" height="280"></canvas><br />
     <button onclick="clearCanvas()">Clear</button>
     <button onclick="predictCanvas()">Predict Drawing</button>
 
     <div id="result"></div>
+
+    <div id="prediction-history">
+        <h3>Recent Predictions</h3>
+        <ul id="prediction-history-list"></ul>
+    </div>
 
     <script>
         const canvas = document.getElementById('canvas');
@@ -108,12 +191,56 @@
             if (response.ok) {
                 const result = await response.json();
                 resultDiv.textContent = `Prediction: ${result.prediction}`;
+                loadRecentPredictions();
             } else {
                 const error = await response.json();
                 resultDiv.textContent = `Error: ${error.error}`;
             }
         }
 
+        // Format date string with local time and UTC offset
+        function formatLocalTimeWithOffset(dateStr) {
+            const d = new Date(dateStr)
+            const options = { 
+                year: 'numeric', month: 'numeric', day: 'numeric',
+                hour: 'numeric', minute: 'numeric', second: 'numeric',
+                hour12: true 
+            };
+            const localTime = d.toLocaleString(undefined, options);
+
+            // Calculate UTC offset in hours and minutes
+            const offsetMinutes = d.getTimezoneOffset();
+            const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
+            const offsetMins = Math.abs(offsetMinutes) % 60;
+            const sign = offsetMinutes <= 0 ? '+' : '-';
+
+            return `${localTime} UTC${sign}${offsetHours}:${offsetMins.toString().padStart(2, '0')}`;
+        }
+
+        async function loadRecentPredictions() {
+            try {
+                const res = await fetch('/predictions');
+                const data = await res.json();
+                const historyList = document.getElementById('prediction-history-list');
+                historyList.innerHTML = '';
+
+                data.forEach(pred => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span class="timestamp">🕒 ${formatLocalTimeWithOffset(pred.timestamp)}</span> - 
+                        Predicted Digit: <b>${pred.prediction}</b> - 
+                        <a href="${pred.s3_uri}" target="_blank" rel="noopener noreferrer">View Image</a>
+                    `;
+                    historyList.appendChild(li);
+                });
+            } catch (err) {
+                console.error("Error loading prediction history:", err);
+            }
+        }
+
+        window.onload = () => {
+            loadRecentPredictions();
+        };
     </script>
 </body>
 
